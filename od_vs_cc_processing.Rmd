@@ -1,0 +1,181 @@
+---
+title: "od vs cc data"
+author: "ciara"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+output:
+  html_document: 
+    df_print: paged
+    css: stylesheet.css
+    number_sections: yes
+    toc: yes
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, echo = TRUE, message=FALSE, warning=FALSE}
+# load libraries
+library(tidyverse) 
+library(latex2exp)
+library(readxl)
+library(growthcurver)
+library(cowplot)
+
+# source all relevant scripting files
+source(file.path("scripts", "plotting_functions.R"))
+
+# global knitting options for automatic saving of all plots as .png and .pdf
+knitr::opts_chunk$set(
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = file.path("fig_output", paste0(gsub("\\.[Rr]md", "", knitr::current_input()), "_"))
+)
+```
+
+Data looking at paracoccus denitrificans in both chemostat (exps 1,2) and batch (exps 3,4) culture. Was looking to see if we can calibrate between coulter counter cells/mL and how the coulter counter does with fixed cells. Cells were fixed with 1% formaldehyde and stored for six months.
+
+# load data
+```{r}
+df <- read_excel("data/chemostat_ccvsod.xlsx")
+
+```
+
+# convert to hours
+```{r}
+
+df_time <- df %>% 
+  # introduce time in hours, sorted by experiment. 
+  group_by(exp) %>% 
+  mutate(time.hours = (time - min(time)) %>% as.numeric("hours") ) %>% 
+  ungroup()
+
+```
+
+# OD vs CC
+## do some calcs
+```{r}
+# od:cc, cells/mL * cell volume, percent of fixed to fresh counts
+
+df_time <- df_time %>% 
+  mutate(
+    ratio = (cc/1e9)/od,
+    `1e9 cells/od` = ratio,
+    `1e9 cells * size [µm] ^3` = cc/1e9 * size^3,
+    percent_og_c = (fix_cc/cc) * 100,
+    percent_og_s = (fix_size/ size) *100
+  )
+
+```
+
+## OD, cc, ratio vs time
+
+```{r}
+  df_time %>% 
+  filter(exp > 2) %>%
+  #filter(exp <=2) %>% 
+  gather("var", "val", od, size, cc,`1e9 cells * size [µm] ^3`, `1e9 cells/od`) %>% 
+  ggplot() +
+  aes(time.hours, val, color = as.factor(exp)) +
+  facet_grid(var ~., scales = "free_y")+
+  geom_point(size = 2)
+
+
+ggsave("fig_output/batch_summary.pdf", width = 6, height = 9, units = c("in"))
+```
+
+
+## plot OD vs cc
+```{r}
+#chemostats = exps 1 and 2
+
+df_time %>% 
+  #filter(exp == 4) %>% 
+  #filter(exp <= 2) %>% 
+  ggplot() +
+  aes(od, cc, color = as.factor(exp)) +
+  geom_point() 
+
+```
+
+## cc vs time for batch 4
+```{r}
+df_time %>% 
+  filter(exp == 4) %>% 
+  ggplot() +
+  aes(time.hours, cc, color = as.factor(rep)) +
+  geom_point()
+
+# yikes 
+```
+
+## plot ratio (od/cc) vs time
+```{r}
+df_time %>% 
+  #filter(temp == 30) %>% 
+  ggplot() +
+  aes(time.hours, ratio, color = as.factor(exp)) +
+  geom_point()
+```
+
+## plot vs size
+```{r}
+df_time %>% 
+  #filter(exp > 2) %>% 
+  ggplot() +
+  aes(time.hours, size, color = as.factor(exp)) +
+  geom_point()
+```
+
+# orginal vs fixed
+## original counts vs fixed
+```{r}
+fixcount_p <- df_time %>% 
+  filter(exp < 3) %>% 
+  ggplot() +
+  aes(cc, fix_cc, color = as.factor(exp)) +
+  geom_abline() +
+  geom_point()
+
+fixcount_p
+```
+
+## size vs fixed cells
+```{r}
+fixsize_p <- df_time %>% 
+  ggplot() +
+  aes(size, fix_size, color = as.factor(exp)) +
+  geom_abline() +
+  geom_point()
+
+fixsize_p
+# some of those fixes sizes are skewed by weird tails that appeared in the fixed cell counts, excluding them gets them much closer to the orginal size
+```
+
+# fixed cells number vs. size ratio
+
+```{r}
+df_time %>% 
+  mutate(
+    `fix cc/cc` = fix_cc/cc,
+    `fix size/size` = fix_size/size
+  ) %>% 
+  ggplot() +
+  aes(`fix size/size`, `fix cc/cc`, color = factor(exp)) +
+  geom_point(data = tibble(x = 1, y = 1), map = aes(x, y, color = NULL), shape = 17, size = 8) +
+  geom_point(size = 4)
+
+ggsave("fig_output/fixedvsfresh_summary.pdf")
+
+```
+
+
+## percent change
+```{r}
+df_time %>% 
+  ggplot() +
+  aes(exp, percent_og_c) +
+  geom_point()
+```
+
