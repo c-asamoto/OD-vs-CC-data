@@ -4,4 +4,4 @@ This dataset summarizes initial experiments looking at coulter counter cell/mL c
 
 We were also interested to see how fixing cells in 1% formaldehyde would impact the counts. Fixed cells were stored for six months. Fixed cell counts were only done for the chemostat experiments.
 
-There are summary figs in the presentations folder and a knitted file of the analysis.
+There are summary figs in the presentations folder and a knitted file of the analysis in the docs folder.
